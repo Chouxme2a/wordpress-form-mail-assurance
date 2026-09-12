@@ -39,5 +39,14 @@ if (onboarding) {
   if (!sessionId) onboarding.innerHTML = "<h2>Payment session missing</h2><p>Return using the secure link supplied after checkout.</p>";
   else fetch(`${API}/api/onboarding/session`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session_id: sessionId }) })
     .then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error); return data; })
-    .then((data) => { onboarding.innerHTML = `<span class="status">Payment verified</span><h1>Connect your first site</h1><div class="grid3"><div class="step"><h3>1. Download</h3><p><a class="button" href="${data.plugin_url}">Download WordPress helper</a></p></div><div class="step"><h3>2. Install</h3><p>WordPress → Plugins → Add New → Upload Plugin → Activate.</p></div><div class="step"><h3>3. Connect</h3><p>Settings → Form & Mail Assurance. Paste this one-time token:</p><div class="onboarding-token">${data.activation_token}</div></div></div><p class="fine">The token expires in 24 hours. Discovery and the first delivery test start automatically after connection. Unsupported sites are rejected without manual setup.</p>`; });
+    .then((data) => {
+      onboarding.innerHTML = `<span class="status">Payment verified</span><h1>Connect your first site</h1><div class="grid3"><div class="step"><h3>1. Download</h3><p><a class="button" href="${data.plugin_url}">Download WordPress helper</a></p></div><div class="step"><h3>2. Install</h3><p>WordPress → Plugins → Add New → Upload Plugin → Activate.</p></div><div class="step"><h3>3. Connect</h3><p>Settings → Form & Mail Assurance. Paste this one-time token:</p><div class="onboarding-token">${data.activation_token}</div></div></div><p class="fine">The token expires in 24 hours. Discovery and the first delivery test start automatically after connection. Unsupported sites are rejected without manual setup.</p><p><button type="button" data-portal>Manage or cancel subscription</button></p>`;
+      onboarding.querySelector("[data-portal]").addEventListener("click", async (event) => {
+        event.currentTarget.disabled = true;
+        const response = await fetch(`${API}/api/stripe/portal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session_id: sessionId }) });
+        const portal = await response.json();
+        if (response.ok) location.href = portal.url;
+        else { event.currentTarget.disabled = false; event.currentTarget.textContent = "Portal temporarily unavailable — retry"; }
+      });
+    });
 }

@@ -61,9 +61,15 @@ async function issueActivation(env, accountId) {
 }
 
 async function verifyStripeSignature(secret, raw, header) {
-  const parts = Object.fromEntries(header.split(",").map((part) => part.split("=")));
-  if (!parts.t || !parts.v1 || Math.abs(Date.now() / 1000 - Number(parts.t)) > 300) return false;
-  return (await hmac(secret, `${parts.t}.${raw}`)) === parts.v1;
+  const values = header.split(",").reduce((all, part) => {
+    const [key, value] = part.split("=");
+    (all[key] ||= []).push(value);
+    return all;
+  }, {});
+  const timestamp = values.t?.[0];
+  if (!timestamp || !values.v1?.length || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+  const expected = await hmac(secret, `${timestamp}.${raw}`);
+  return values.v1.some((signature) => signature === expected);
 }
 
 async function gmailAccessToken(env) {
@@ -179,7 +185,10 @@ export default {
             .bind(session.subscription || session.id, account.id, session.subscription || null, planName, "active", PLANS[planName].sites).run();
           await event(env, "payment_success", { accountId: account.id, properties: { plan: planName } });
         }
-        if (hook.type === "customer.subscription.deleted") await event(env, "cancel", { properties: { stripe_subscription_id: hook.data.object.id } });
+        if (hook.type === "customer.subscription.deleted") {
+          await env.DB.prepare("UPDATE subscriptions SET status='cancelled' WHERE stripe_subscription_id=?").bind(hook.data.object.id).run();
+          await event(env, "cancel", { properties: { stripe_subscription_id: hook.data.object.id } });
+        }
         if (hook.type === "charge.refunded") await event(env, "refund", { properties: { charge_id: hook.data.object.id } });
         return json({ received: true });
       }
@@ -192,6 +201,14 @@ export default {
         const token = await issueActivation(env, account.id);
         await event(env, "onboarding_start", { accountId: account.id });
         return json({ email: account.email, activation_token: token, plugin_url: `${env.APP_URL}/wp-form-mail-assurance.zip` }, 200, cors);
+      }
+      if (url.pathname === "/api/stripe/portal" && request.method === "POST") {
+        const { session_id: sessionId } = await request.json();
+        const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId || "")}`, { headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}` } });
+        const session = await response.json();
+        if (!response.ok || session.payment_status !== "paid" || !session.customer) return json({ error: "payment_not_verified" }, 403, cors);
+        const portal = await stripe(env, "billing_portal/sessions", { customer: session.customer, return_url: `${env.APP_URL}/onboarding/?session_id=${encodeURIComponent(sessionId)}` });
+        return json({ url: portal.url }, 200, cors);
       }
       if (url.pathname === "/api/plugin/connect" && request.method === "POST") {
         const body = await request.json();
