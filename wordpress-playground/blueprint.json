@@ -1,0 +1,17 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "preferredVersions": { "php": "8.3", "wp": "latest" },
+  "landingPage": "/wp-admin/admin.php?page=wpcf7",
+  "login": false,
+  "steps": [
+    {
+      "step": "installPlugin",
+      "pluginData": { "resource": "wordpress.org/plugins", "slug": "contact-form-7" },
+      "options": { "activate": true }
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php require '/wordpress/wp-load.php'; update_option('wfma_site_secret', 'local-proof-secret-change-before-public-use'); update_option('wfma_oracle_email', 'wpformmailassurance@gmail.com'); if (!get_page_by_path('wfma-proof')) { wp_insert_post(['post_title'=>'WFMA Proof','post_name'=>'wfma-proof','post_status'=>'publish','post_type'=>'page','post_content'=>'[contact-form-7 id=\"1\" title=\"WFMA Proof\"]']); } ?>"
+    }
+  ]
+}
