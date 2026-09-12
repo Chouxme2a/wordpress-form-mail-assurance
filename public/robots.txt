@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://wp-form-mail-assurance.wordpress-form-mail-assurance.workers.dev/sitemap.xml
