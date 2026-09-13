@@ -76,7 +76,7 @@ async function gmailAccessToken(env) {
   const body = new URLSearchParams({ client_id: env.GMAIL_CLIENT_ID, client_secret: env.GMAIL_CLIENT_SECRET, refresh_token: env.GMAIL_REFRESH_TOKEN, grant_type: "refresh_token" });
   const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body });
   const data = await response.json();
-  if (!response.ok) throw new Error(`Gmail OAuth ${response.status}`);
+  if (!response.ok) throw new Error(`Gmail OAuth ${response.status}: ${[data.error, data.error_description].filter(Boolean).join(": ")}`);
   return data.access_token;
 }
 
