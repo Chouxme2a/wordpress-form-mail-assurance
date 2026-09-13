@@ -213,24 +213,23 @@ export default {
       if (url.pathname === "/api/plugin/connect" && request.method === "POST") {
         const body = await request.json();
         const tokenHash = await sha256(body.activation_token || "");
-        const activation = await env.DB.prepare("SELECT * FROM activation_tokens WHERE token_hash=? AND consumed_at IS NULL AND expires_at>CURRENT_TIMESTAMP").bind(tokenHash).first();
+        const activation = await env.DB.prepare("SELECT * FROM activation_tokens WHERE token_hash=? AND expires_at>CURRENT_TIMESTAMP").bind(tokenHash).first();
         if (!activation) return json({ error: "invalid_or_expired_token" }, 403, cors);
-        const siteCount = await env.DB.prepare("SELECT COUNT(*) AS total FROM sites WHERE account_id=?").bind(activation.account_id).first();
-        const subscription = await env.DB.prepare("SELECT site_limit FROM subscriptions WHERE account_id=? AND status='active' ORDER BY created_at DESC").bind(activation.account_id).first();
-        if (!subscription || siteCount.total >= subscription.site_limit) return json({ error: "site_limit_reached" }, 422, cors);
         let parsedUrl;
         try { parsedUrl = new URL(body.site_url); } catch { return json({ error: "invalid_site_url" }, 400, cors); }
         if (parsedUrl.protocol !== "https:") return json({ error: "https_required" }, 422, cors);
+        const normalizedUrl = `${parsedUrl.origin}${parsedUrl.pathname.replace(/\/$/, "")}`;
+        const existing = await env.DB.prepare("SELECT id, secret, state FROM sites WHERE account_id=? AND url=?").bind(activation.account_id, normalizedUrl).first();
+        if (existing) return json({ status: "CONNECTED", site_id: existing.id, site_secret: existing.secret, first_test: existing.state === "pending" ? "scheduled" : "already_completed" }, 200, cors);
+        const siteCount = await env.DB.prepare("SELECT COUNT(*) AS total FROM sites WHERE account_id=?").bind(activation.account_id).first();
+        const subscription = await env.DB.prepare("SELECT site_limit FROM subscriptions WHERE account_id=? AND status='active' ORDER BY created_at DESC").bind(activation.account_id).first();
+        if (!subscription || siteCount.total >= subscription.site_limit) return json({ error: "site_limit_reached" }, 422, cors);
         const forms = Array.isArray(body.forms) ? body.forms : [];
         const supported = forms.find((form) => form.status === "SUPPORTED" && form.provider === "contact-form-7");
         if (!supported) return json({ status: "UNSUPPORTED — NOT MONITORED", error: "no_verified_contact_form_7_form" }, 422, cors);
         const siteId = crypto.randomUUID();
         const secret = randomHex(32);
-        const normalizedUrl = `${parsedUrl.origin}${parsedUrl.pathname.replace(/\/$/, "")}`;
-        await env.DB.batch([
-          env.DB.prepare("INSERT INTO sites(id,account_id,url,secret,form_id,provider,state) VALUES(?,?,?,?,?,?,'pending')").bind(siteId, activation.account_id, normalizedUrl, secret, String(supported.id), "contact-form-7"),
-          env.DB.prepare("UPDATE activation_tokens SET consumed_at=CURRENT_TIMESTAMP WHERE token_hash=?").bind(tokenHash),
-        ]);
+        await env.DB.prepare("INSERT INTO sites(id,account_id,url,secret,form_id,provider,state) VALUES(?,?,?,?,?,?,'pending')").bind(siteId, activation.account_id, normalizedUrl, secret, String(supported.id), "contact-form-7").run();
         await event(env, "plugin_connected", { accountId: activation.account_id, siteId, properties: { provider: "contact-form-7" } });
         const site = { id: siteId, account_id: activation.account_id, url: normalizedUrl, secret, form_id: String(supported.id), provider: "contact-form-7", state: "pending" };
         ctx.waitUntil(gmailAccessToken(env).then((token) => monitorSite(env, site, token)));

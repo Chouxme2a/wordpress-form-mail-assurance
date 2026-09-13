@@ -44,7 +44,7 @@ final class WFMA_Helper {
             <p><strong>Status:</strong> CONNECTED</p><p><strong>Site ID:</strong> <code><?php echo esc_html($site_id); ?></code></p>
             <p>Monitoring, retries, incidents and recovery run remotely. No WordPress administrator action is required.</p>
         <?php else: ?>
-            <p>Paste the one-time activation token shown after Stripe Checkout. The helper sends the site URL and locally discovered form identifiers to the assurance service.</p>
+            <p>Paste the agency connection token shown after Stripe Checkout. The same 24-hour token can connect each site included in the plan. The helper sends the site URL and locally discovered form identifiers to the assurance service.</p>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="wfma_connect"><?php wp_nonce_field('wfma_connect'); ?>
                 <table class="form-table"><tr><th><label for="wfma_token">Activation token</label></th><td><input id="wfma_token" name="activation_token" type="password" class="regular-text" autocomplete="off" required></td></tr></table>
