@@ -1,3 +1,9 @@
+const analyticsBeacon = document.createElement("script");
+analyticsBeacon.type = "module";
+analyticsBeacon.src = "https://static.cloudflareinsights.com/beacon.min.js";
+analyticsBeacon.dataset.cfBeacon = JSON.stringify({ token: "332b088c1f04467db0da0627f0d657c7" });
+document.head.append(analyticsBeacon);
+
 const API = window.WFMA_API || "https://wp-form-mail-assurance-api.wordpress-form-mail-assurance.workers.dev";
 const track = (name, properties = {}) => fetch(`${API}/api/events`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, properties }), keepalive: true }).catch(() => {});
 track(location.pathname.startsWith("/pricing") ? "pricing_view" : location.pathname.startsWith("/onboarding") ? "onboarding_start" : "landing_view");
