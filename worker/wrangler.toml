@@ -9,7 +9,7 @@ database_id = "8b4f370b-05fa-4601-94c1-871c0f7ef9f4"
 
 [vars]
 APP_URL = "https://wp-form-mail-assurance.wordpress-form-mail-assurance.workers.dev"
-GMAIL_MAILBOX = "wpformmailassurance@gmail.com"
+GMAIL_MAILBOX = "contact@at-studio.fr"
 STRIPE_PRICE_STARTER = "price_1UEyVQRMtzPv4CewetFvvxPK"
 STRIPE_PRICE_AGENCY = "price_1UEyVRRMtzPv4CewfTudbfCX"
 STRIPE_PRICE_SCALE = "price_1UEyVRRMtzPv4CewjX3GlzMg"
