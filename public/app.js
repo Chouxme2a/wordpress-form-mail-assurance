@@ -20,10 +20,14 @@ try {
   const stored = localStorage.getItem("wfma_attribution");
   if (stored) attribution = JSON.parse(stored);
   const hasUtm = ["utm_source", "utm_medium", "utm_campaign", "utm_content"].some((key) => params.has(key));
-  if (!stored || hasUtm) {
+  // Fallback for directories that rewrite outbound links to their own "?ref=" param
+  // instead of preserving our UTM (observed on Product Hunt; same pattern is common
+  // on SaaSHub, AlternativeTo, etc.) so this traffic is still attributable.
+  const ref = params.get("ref");
+  if (!stored || hasUtm || ref) {
     attribution = {
-      utm_source: params.get("utm_source") || attribution.utm_source || null,
-      utm_medium: params.get("utm_medium") || attribution.utm_medium || null,
+      utm_source: params.get("utm_source") || attribution.utm_source || ref || null,
+      utm_medium: params.get("utm_medium") || attribution.utm_medium || (ref ? "referral" : null),
       utm_campaign: params.get("utm_campaign") || attribution.utm_campaign || null,
       utm_content: params.get("utm_content") || attribution.utm_content || null,
       referrer: attribution.referrer || document.referrer || null,
