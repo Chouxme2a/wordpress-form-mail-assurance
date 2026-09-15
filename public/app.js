@@ -5,7 +5,35 @@ analyticsBeacon.dataset.cfBeacon = JSON.stringify({ token: "332b088c1f04467db0da
 document.head.append(analyticsBeacon);
 
 const API = window.WFMA_API || "https://wp-form-mail-assurance-api.wordpress-form-mail-assurance.workers.dev";
-const track = (name, properties = {}) => fetch(`${API}/api/events`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, properties }), keepalive: true }).catch(() => {});
+
+// Internal-traffic tagging: visit once with ?wfma_internal=1 (e.g. bookmark it) to
+// permanently flag this browser's own events as internal, without dropping them.
+const params = new URLSearchParams(location.search);
+if (params.get("wfma_internal") === "1") { try { localStorage.setItem("wfma_internal", "1"); } catch {} }
+let isInternal = false;
+try { isInternal = localStorage.getItem("wfma_internal") === "1"; } catch {}
+
+// First-touch attribution: capture UTM params + referrer once per browser and
+// keep sending them on every event so later funnel steps stay attributable.
+let attribution = {};
+try {
+  const stored = localStorage.getItem("wfma_attribution");
+  if (stored) attribution = JSON.parse(stored);
+  const hasUtm = ["utm_source", "utm_medium", "utm_campaign", "utm_content"].some((key) => params.has(key));
+  if (!stored || hasUtm) {
+    attribution = {
+      utm_source: params.get("utm_source") || attribution.utm_source || null,
+      utm_medium: params.get("utm_medium") || attribution.utm_medium || null,
+      utm_campaign: params.get("utm_campaign") || attribution.utm_campaign || null,
+      utm_content: params.get("utm_content") || attribution.utm_content || null,
+      referrer: attribution.referrer || document.referrer || null,
+      landing_path: attribution.landing_path || location.pathname,
+    };
+    localStorage.setItem("wfma_attribution", JSON.stringify(attribution));
+  }
+} catch {}
+
+const track = (name, properties = {}) => fetch(`${API}/api/events`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, properties: { ...attribution, internal: isInternal, ...properties } }), keepalive: true }).catch(() => {});
 track(location.pathname.startsWith("/pricing") ? "pricing_view" : location.pathname.startsWith("/onboarding") ? "onboarding_start" : "landing_view");
 
 const checker = document.querySelector("[data-checker]");
@@ -28,6 +56,7 @@ if (checkout) {
   checkout.elements.plan.value = selected;
   checkout.addEventListener("submit", async (event) => {
     event.preventDefault();
+    track("checkout_start", { plan: checkout.elements.plan.value });
     const submit = checkout.querySelector("button"); submit.disabled = true; submit.textContent = "Verifying and opening secure checkout…";
     try {
       const body = Object.fromEntries(new FormData(checkout)); body.managed_sites = Number(body.managed_sites);
@@ -47,6 +76,7 @@ if (onboarding) {
     .then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error); return data; })
     .then((data) => {
       onboarding.innerHTML = `<span class="status">Payment verified</span><h1>Connect your WordPress sites</h1><div class="grid3"><div class="step"><h3>1. Download</h3><p><a class="button" href="${data.plugin_url}">Download WordPress helper</a></p></div><div class="step"><h3>2. Install</h3><p>WordPress → Plugins → Add New → Upload Plugin → Activate.</p></div><div class="step"><h3>3. Connect</h3><p>Settings → Form & Mail Assurance. Paste this agency connection token:</p><div class="onboarding-token">${data.activation_token}</div></div></div><p class="fine">The token can connect every site included in your plan for 24 hours. Reopen this secure checkout-success page later to generate a fresh token. Discovery and the first delivery test start automatically after each connection. Unsupported sites are rejected without manual setup.</p><p><button type="button" data-portal>Manage or cancel subscription</button></p>`;
+      track("onboarding_completed");
       onboarding.querySelector("[data-portal]").addEventListener("click", async (event) => {
         event.currentTarget.disabled = true;
         const response = await fetch(`${API}/api/stripe/portal`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ session_id: sessionId }) });

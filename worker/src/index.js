@@ -149,7 +149,7 @@ export default {
       if (url.pathname === "/health") return json({ ok: true }, 200, cors);
       if (url.pathname === "/api/events" && request.method === "POST") {
         const body = await request.json();
-        if (!["landing_view", "pricing_view", "compatibility_check", "checkout_start", "onboarding_start", "cancel", "refund"].includes(body.name)) return json({ error: "invalid_event" }, 400, cors);
+        if (!["landing_view", "pricing_view", "compatibility_check", "checkout_start", "onboarding_start", "onboarding_completed", "cancel", "refund"].includes(body.name)) return json({ error: "invalid_event" }, 400, cors);
         await event(env, body.name, { properties: body.properties || {} });
         return json({ ok: true }, 202, cors);
       }
