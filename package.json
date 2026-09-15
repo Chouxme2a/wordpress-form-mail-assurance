@@ -9,7 +9,7 @@
     "proof:cycle": "node scripts/run-real-cycle.js",
     "plugin:zip": "cd wordpress-plugin && zip -qr ../public/wp-form-mail-assurance.zip wp-form-mail-assurance",
     "deploy:worker": "wrangler deploy -c worker/wrangler.toml",
-    "deploy:pages": "wrangler pages deploy public --project-name wp-form-mail-assurance",
+    "deploy:pages": "wrangler deploy",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev"
   },
